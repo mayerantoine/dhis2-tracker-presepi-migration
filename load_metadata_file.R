@@ -37,7 +37,7 @@ tb_TrackedEntityAttribute <- do.call(rbind,Map(data.frame, Id=TrackedEntityAttri
 programTrackedEntityAttributeId <- as.list(xmlSApply(programTrackedEntityAttribute, function(x) xmlGetAttr(x,"id")))
 programTrackedEntityAttributeName <- as.list(xmlSApply(programTrackedEntityAttribute, function(x) xmlGetAttr(x,"name")))
 tb_programTrackedEntityAttribute <-  do.call(rbind, Map(data.frame, Id=TrackedEntityAttributeId, name=TrackedEntityAttributeName))
-write_csv(tb_programTrackedEntityAttribute,"tb_programTrackedEntityAttribute.csv")
+#write_csv(tb_programTrackedEntityAttribute,"tb_programTrackedEntityAttribute.csv")
 
 #orgunits
 orgunitsId <- as.list(xmlSApply(orgunits, function(x) xmlGetAttr(x,"id")))
