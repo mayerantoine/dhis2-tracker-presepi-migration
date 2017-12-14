@@ -1,3 +1,12 @@
+################################################################################# 
+## PResePi data migration
+## Mayer Antoine, CDC Haiti
+## Date : 12/12/2017
+## Purpose : Get attributes, program, programStages, dataElement,
+##              identifiers  from DHIS2 to map and create dataset for payload  
+##
+##
+##################################################################################
 
 
 library(RCurl)
@@ -6,8 +15,22 @@ library(tidyverse)
 
 
 rm(list = ls())
-## Programs ----------------------------------------------------------------------------
+## Tracked Entity -----------------------------------------------------------------------------------
+url_id <- "http://209.61.231.45:8082/dhis/api/trackedEntities?fields=id,name&links=false&paging=false"
+entity_response <- getURL(url_id, userpwd = "mantoine:P@ssword001",httpauth = 1L, header=FALSE,ssl.verifypeer = FALSE,
+                          encoding = "utf-8" )
+
+doc_id <-xmlTreeParse(entity_response, useInternalNodes = T)
+root_id <- xmlRoot(doc_id)
+
+trackedEntiiesId <- xmlSApply(root_id[["trackedEntities"]],xmlGetAttr,"id")
+trackedentitesName <- xmlSApply(root_id[["trackedEntities"]],xmlGetAttr,"name")
+
+
+## Programs -----------------------------------------------------------------------------------------
 #http://209.61.231.45:8082/dhis/api/programs?&fields=id,name&links=false&paging=false
+
+
 
 ## PRESEPI Program
 url <- "http://209.61.231.45:8082/dhis/api/programs/ybHHvBdo1ke.xml?fields=id,name,programTrackedEntityAttributes[id,name,code],organisationUnits[id,name],programStages[id,name]"
@@ -15,7 +38,6 @@ url <- "http://209.61.231.45:8082/dhis/api/programs/ybHHvBdo1ke.xml?fields=id,na
 response <- getURL(url, userpwd = "mantoine:P@ssword001",httpauth = 1L, header=FALSE,ssl.verifypeer = FALSE,encoding = "utf-8" )
 doc <- xmlTreeParse(response,useInternalNodes = T)
 rootNode <- xmlRoot(doc)
-xmlName(rootNode)
 programStages <- rootNode[["programStages"]]
 programTrackedEntityAttribute <- rootNode[["programTrackedEntityAttributes"]]
 orgunits <- rootNode[["organisationUnits"]] 
@@ -40,42 +62,25 @@ tb_orgunits <-  do.call(rbind, Map(data.frame, Id=orgunitsId, name=orgunitsName)
 # mapping each programStage with his dataelement
 
 
-url_1 <- "http://209.61.231.45:8082/dhis/api/programStages/Li8CKAWWS1q.xml"
-resp <- getURL(url_1, userpwd = "mantoine:P@ssword001",httpauth = 1L, header=FALSE,
-               ssl.verifypeer = FALSE,encoding = "utf-8" )
-rootNodeStage <- xmlRoot(xmlTreeParse(resp,useInternalNodes = T))
-programStageDataElements <- rootNodeStage[["programStageDataElements"]]
-
-node_1 <- programStageDataElements[[1]]
-d <- xpathSApply(node_1, "//dataElement[@id]", xmlGetAttr, "id")
-
-p_data <- as.list(xmlSApply(programStageDataElements, 
-                function(x){ xmlGetAttr( x[["dataElement"]],"id")
-
-    }))
-
-
-
 base_url <- "http://209.61.231.45:8082/dhis/api/programStages/"
-#http://209.61.231.45:8082/dhis/api/programStages/Li8CKAWWS1q.xml?fields=id,name,programStageDataElements[id]
+#http://209.61.231.45:8082/dhis/api/programStages/Li8CKAWWS1q.json?fields=id,name,programStageDataElements[id]
 
 
- tab <- map(ProgramStageId,function(x){
+programStageDataElements_list <- map(ProgramStageId,function(x){
     stage <- x
     url_stage <- paste0(base_url,stage,".xml")
-    #print(url_stage)
-    
+  
     resp <- getURL(url_stage, userpwd = "mantoine:P@ssword001",httpauth = 1L, header=FALSE,
                    ssl.verifypeer = FALSE,encoding = "utf-8" )
     rootNodeStage <- xmlRoot(xmlTreeParse(resp,useInternalNodes = T))
     programStageDataElements <- rootNodeStage[["programStageDataElements"]]
     
-    dataElemtId <- as.list(xmlSApply(programStageDataElements, 
+    dataElementId <- as.list(xmlSApply(programStageDataElements, 
                       function(x){ xmlGetAttr( x[["dataElement"]],"id")
                           
                       }))
     
-     list(programStage = stage, dataElement = dataElemtId)
+     list(programStage = stage, dataElement = dataElementId)
 })
 
 
@@ -84,9 +89,18 @@ base_url <- "http://209.61.231.45:8082/dhis/api/programStages/"
 ## dataElements --------------------------------------------------
 # http://209.61.231.45:8082/dhis/api/dataElements?fields=id,name,domainType,code&links=false&paging=false
 
-# Get metadata
-# Create excel template with the data needed
-# review the request sequence to populate the tracker to ensure you have alll the data needed
-# how you will create the input data : merge metadata & datavalue
-# how will you validate the import
-# test environnement 
+dataelement_url <- "http://209.61.231.45:8082/dhis/api/dataElements.xml?fields=id,name,domainType,code&links=false&paging=false&filter=code:!eq:null"
+
+response_data <- getURL(dataelement_url, userpwd = "mantoine:P@ssword001",httpauth = 1L, header=FALSE,
+                                                 ssl.verifypeer = FALSE,encoding = "utf-8" )
+doc_data <- xmlTreeParse(response_data,useInternalNodes = T)
+rootNode_data <- xmlRoot(doc_data)
+dataElements <- rootNode_data[["dataElements"]]
+
+dataElementId <- xmlSApply(dataElements, xmlGetAttr,"id")
+dataElementName <- xmlSApply(dataElements, xmlGetAttr,"name")
+dataElementCode <- xmlSApply(dataElements, xmlGetAttr,"code")
+
+tb_dataElement <-  do.call(rbind, Map(data.frame, Id=dataElementId, name=dataElementName,code=dataElementCode))
+
+
