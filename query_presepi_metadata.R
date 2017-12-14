@@ -15,24 +15,44 @@ library(tidyverse)
 
 
 rm(list = ls())
+
 ## Tracked Entity -----------------------------------------------------------------------------------
-url_id <- "http://209.61.231.45:8082/dhis/api/trackedEntities?fields=id,name&links=false&paging=false"
+url_id <- "http://209.61.231.45:8082/dhis/api/trackedEntities.xml?fields=id,name&links=false&paging=false"
 entity_response <- getURL(url_id, userpwd = "mantoine:P@ssword001",httpauth = 1L, header=FALSE,ssl.verifypeer = FALSE,
                           encoding = "utf-8" )
 
 doc_id <-xmlTreeParse(entity_response, useInternalNodes = T)
 root_id <- xmlRoot(doc_id)
 
-trackedEntiiesId <- xmlSApply(root_id[["trackedEntities"]],xmlGetAttr,"id")
-trackedentitesName <- xmlSApply(root_id[["trackedEntities"]],xmlGetAttr,"name")
+trackedEntitiesId <- xmlSApply(root_id[["trackedEntities"]],xmlGetAttr,"id")
+trackedEntitiesName <- xmlSApply(root_id[["trackedEntities"]],xmlGetAttr,"name")
 
+trackedEntity <- trackedEntitiesId[[1]]
 
-## Programs -----------------------------------------------------------------------------------------
+## Programs --------------------------------------------------------------------------------------------------------------
 #http://209.61.231.45:8082/dhis/api/programs?&fields=id,name&links=false&paging=false
 
+url_program <- "http://209.61.231.45:8082/dhis/api/programs.xml?fields=id,name&links=false&paging=false"
+entity_response <- getURL(url_program, userpwd = "mantoine:P@ssword001",httpauth = 1L, header=FALSE,ssl.verifypeer = FALSE,
+                          encoding = "utf-8" )
+
+doc_id <-xmlTreeParse(entity_response, useInternalNodes = T)
+root_id <- xmlRoot(doc_id)
+
+programId <- xmlSApply(root_id[["programs"]],xmlGetAttr,"id")
+programName <- xmlSApply(root_id[["programs"]],xmlGetAttr,"name")
+tb_program <-  do.call(rbind, Map(data.frame, Id=programId, name=programName))
+
+PRESEpiId <- tb_program %>% 
+    filter(name == "PRESEpi") %>%
+    select(Id)
+
+PRESEpiId <- droplevels(PRESEpiId$Id)
 
 
-## PRESEPI Program
+## PRESEPI Program -------------------------------------------------------------------------------------------------------
+## url <- "http://209.61.231.45:8082/dhis/api/programs/ybHHvBdo1ke.xml?fields=id,name,programTrackedEntityAttributes[id,name,code],organisationUnits[id,name],programStages[id,name]"
+
 url <- "http://209.61.231.45:8082/dhis/api/programs/ybHHvBdo1ke.xml?fields=id,name,programTrackedEntityAttributes[id,name,code],organisationUnits[id,name],programStages[id,name]"
 
 response <- getURL(url, userpwd = "mantoine:P@ssword001",httpauth = 1L, header=FALSE,ssl.verifypeer = FALSE,encoding = "utf-8" )

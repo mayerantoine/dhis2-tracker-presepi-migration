@@ -25,10 +25,10 @@ names(main_data_col) <- "presepi_variables"
 presepi_sites <- distinct(main_data[,c("SiteName")])
 presepi_sites <- presepi_sites[!is.na(presepi_sites$SiteName),]
 
-#source("query_presepi_metadata.R")
+source("query_presepi_metadata.R")
 
 #### LOAD Mapping
-mapping <- read_csv("presepi_mapping_v2.csv",col_names = T)
+mapping <- read_csv("./data/presepi_mapping_v2.csv",col_names = T)
 mapping <- mapping[!is.na(mapping$dataelement),]
 mapping$dataelement <- trimws(mapping$dataelement,which = c("right"))
 
@@ -36,11 +36,20 @@ metadata <- rbind(tb_programTrackedEntityAttribute[c(1:2)],tb_dataElement[c(1:2)
 
 mapping <- left_join(mapping,metadata,by=c("dataelement" = "name"))
 
-node <- newXMLNode("data")
+node <- newXMLNode("data", attrs = list(trackedEntity = trackedEntity,program = programId[[2]]))
+
 nodeCollection <- c("Instances","ProgramStages")
 sapply(nodeCollection,newXMLNode,parent = node)
 
 cat(saveXML(node))
+
+mapping_p <- mapping %>%  filter(!is.na(mapping$Id)) %>% select(VariableName,Id)
+
+mapping_p
+
+
+ main_data %>%
+     select(mapping_p$VariableName)
 
 # write_csv(main_data_col,"main_data_col.csv")
 #write_csv(tb_dataElement,"dataElements2.csv")
