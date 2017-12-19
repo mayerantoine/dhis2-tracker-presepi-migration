@@ -14,7 +14,7 @@ library(XML)
 library(tidyverse)
 
 
-rm(list = ls())
+#rm(list = ls())
 
 ## Tracked Entity -----------------------------------------------------------------------------------
 url_id <- "http://209.61.231.45:8082/dhis/api/trackedEntities.xml?fields=id,name&links=false&paging=false"
@@ -65,17 +65,19 @@ orgunits <- rootNode[["organisationUnits"]]
 #programTrackedEntity
 programTrackedEntityAttributeId <- as.list(xmlSApply(programTrackedEntityAttribute, xmlGetAttr,"id"))
 programTrackedEntityAttributeName <- as.list(xmlSApply(programTrackedEntityAttribute, xmlGetAttr,"name"))
-tb_programTrackedEntityAttribute <-  do.call(rbind, Map(data.frame, Id=programTrackedEntityAttributeId, name=programTrackedEntityAttributeName))
+tb_programTrackedEntityAttribute <-  do.call(rbind, Map(data.frame, Id=programTrackedEntityAttributeId, 
+                                                        name=programTrackedEntityAttributeName,stringsAsFactors = FALSE))
 
 #programStages
 ProgramStageId <- as.list(xmlSApply(programStages,xmlGetAttr,"id"))
 ProgramStageName <- as.list(xmlSApply(programStages, xmlGetAttr,"name"))
-tb_programStage <-  do.call(rbind, Map(data.frame, Id=ProgramStageId, name=ProgramStageName))
+tb_programStage <-  do.call(rbind, Map(data.frame, Id=ProgramStageId, name=ProgramStageName,stringsAsFactors = FALSE))
 
 #orgunits
 orgunitsId <- as.list(xmlSApply(orgunits,xmlGetAttr,"id"))
 orgunitsName <- as.list(xmlSApply(orgunits,xmlGetAttr,"name"))
-tb_orgunits <-  do.call(rbind, Map(data.frame, Id=orgunitsId, name=orgunitsName))
+tb_orgunits <- do.call(rbind, Map(data.frame, Id=orgunitsId, name=orgunitsName,stringsAsFactors = FALSE))
+
 
 ## Get a programStage -------------------------------------------------------
 # http://209.61.231.45:8082/dhis/api/programStages/Li8CKAWWS1q
@@ -85,6 +87,8 @@ tb_orgunits <-  do.call(rbind, Map(data.frame, Id=orgunitsId, name=orgunitsName)
 base_url <- "http://209.61.231.45:8082/dhis/api/programStages/"
 #http://209.61.231.45:8082/dhis/api/programStages/Li8CKAWWS1q.json?fields=id,name,programStageDataElements[id]
 
+#how does map work, map_df, do.call vs lapply
+# how to return a dataframe
 
 programStageDataElements_list <- map(ProgramStageId,function(x){
     stage <- x
@@ -100,10 +104,13 @@ programStageDataElements_list <- map(ProgramStageId,function(x){
                           
                       }))
     
-     list(programStage = stage, dataElement = dataElementId)
+     s <- list(programStage = stage, dataElement = dataElementId)
+     as.data.frame(do.call(rbind,lapply(s$dataElement,cbind,s$programStage)))
 })
 
 
+tb_programStageDataElement <- as.data.frame(do.call(rbind,programStageDataElements_list))
+names(tb_programStageDataElement) <- c("dataElement","programStage")
 
 
 ## dataElements --------------------------------------------------
