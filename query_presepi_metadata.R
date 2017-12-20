@@ -16,6 +16,9 @@ library(tidyverse)
 
 #rm(list = ls())
 
+## why do i do to download Malaria metadata ? can this be not coupe to a specific program ?
+## how to organise and display metadata dowloaded
+
 ## Tracked Entity -----------------------------------------------------------------------------------
 url_id <- "http://209.61.231.45:8082/dhis/api/trackedEntities.xml?fields=id,name&links=false&paging=false"
 entity_response <- getURL(url_id, userpwd = "mantoine:P@ssword001",httpauth = 1L, header=FALSE,ssl.verifypeer = FALSE,
