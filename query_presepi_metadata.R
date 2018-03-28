@@ -83,14 +83,12 @@ getProgram <- function() {
     
     programId <- xmlSApply(root_id[["programs"]], xmlGetAttr, "id")
     programName <- xmlSApply(root_id[["programs"]], xmlGetAttr, "name")
-    tb_program <-
+    df_program <-
         do.call(rbind, Map(data.frame, Id = programId, name = programName))
     
-    PRESEpiId <- tb_program %>%
-        filter(name == "PRESEpi") %>%
-        select(Id)
+    df_program
     
-    PRESEpiId <- droplevels(PRESEpiId$Id)
+
 }
 
 
@@ -137,7 +135,7 @@ getProgamStages <- function() {
     ProgramStageId <- as.list(xmlSApply(programStages, xmlGetAttr, "id"))
     ProgramStageName <-
         as.list(xmlSApply(programStages, xmlGetAttr, "name"))
-    tb_programStage <-
+    df_programStage <-
         do.call(
             rbind,
             Map(
@@ -147,6 +145,10 @@ getProgamStages <- function() {
                 stringsAsFactors = FALSE
             )
         )
+    
+      Encoding(df_programStage$name) <-"UTF-8"
+      
+      df_programStage
     
 }
 
@@ -167,7 +169,7 @@ getOrgunits <- function(){
         do.call(rbind,
                 Map(
                     data.frame,
-                    Id = orgunitsId,
+                    orgunitsId = orgunitsId,
                     name = orgunitsName,
                     stringsAsFactors = FALSE
                 ))
@@ -212,10 +214,13 @@ getPresePiProgramStage <- function(ProgramStageId) {
     })
     
     
-    tb_programStageDataElement <-
+    df_programStageDataElement <-
         as.data.frame(do.call(rbind, programStageDataElements_list))
-    names(tb_programStageDataElement) <- c("dataElement", "programStage")
-    tb_programStageDataElement
+    names(df_programStageDataElement) <- c("dataElement", "programStage")
+    
+ 
+
+    df_programStageDataElement
 
 }
 
@@ -253,7 +258,7 @@ getDataElement <- function() {
 ## run all ------------------------------------------------------------------------------------------------
 
 trackedEntity <- getTrackedEntity()
-PRESEpiId <- getProgram()
+df_program <- getProgram()
 
 df_programTrackedEntityAttribute <- getProgramTrackedEntity()
 df_programStages <- getProgamStages()

@@ -18,8 +18,11 @@ source("query_presepi_metadata.R")
 loadMainData <- function() {
     
     # main_data table
-    main_data <- read_tsv("./data/main_data_final.txt",col_names = T)
+    df_main_data <-
+        read_tsv("./data/main_data_final.txt",col_names = T) %>%
+        filter(!is.na(SiteCode))
     
+    df_main_data
     # main data complement table
     # meningitis table ?? for meningitis will do a different script
 
@@ -28,8 +31,9 @@ loadMainData <- function() {
 loadSiteMapping <- function(){
     
         # facility maping : The file contains site name and site code in the legacy database , site name in dhis2 tracker
-    site_mapping <- as.data.frame( read_tsv("./data/site_mapping.txt", col_names = T),
+    df_site_mapping <- as.data.frame( read_tsv("./data/site_mapping.txt", col_names = T),
                                    stringsAsFactors = FALSE)
+    df_site_mapping
 }
 
 
@@ -38,7 +42,7 @@ getVariableMapping <- function() {
     
     # variables mapping table
     # This is the most important input for the data generation process, match presepi variable names, dhis names
-   mapping <- read_csv("./data/presepi_mapping_v2.csv",col_names = T)
+   df_mapping <- read_csv("./data/presepi_mapping_v2.csv",col_names = T)
     
     ## clean the mapping ---------------------------------------------------------------------------
     
@@ -48,7 +52,7 @@ getVariableMapping <- function() {
     # check and allow us to double check if the mapping file is in sync whith the data imported because 
     # the mapping file was not done from the main_data file
         
-   mapping <-  mapping %>%
+   df_mapping <-  df_mapping %>%
        
        #trim data removing any trailing spaces at the end of dataelements
        mutate(dataelement = trimws(dataelement, which= c("right"))) %>%
@@ -57,7 +61,7 @@ getVariableMapping <- function() {
        filter(!is.na(dataelement)) %>%
        
        #keeping only variables in presepi that we can find in the main data
-       filter(VariableName %in% names(main_data)) %>%
+       filter(VariableName %in% names(df_main_data)) %>%
       
        # adding dataelement Ids in the mapping dataframe
        left_join(df_metadata,by=c("dataelement" = "name")) %>%
@@ -75,130 +79,124 @@ getVariableMapping <- function() {
         
 }
 
-    loadMainData()
+    df_main_data <- loadMainData()
     
-    loadSiteMapping()
+    df_site_mapping <- loadSiteMapping()
     
-    getVariableMapping()
+    df_mapping <- getVariableMapping()
+    
+# which sites ?  date ? how many records by site?
 
 generateXMLDataFile <- function() {
+
     
-    # select only data correctly mapped with dhis2 using ?? why ??
-    # data needed to create tracker instances
-    loop_data <- main_data %>%
-        select(SiteCode,DateFrm,mapping$VariableName) %>%
-        as.data.frame(stringsAsFactors = FALSE)
+    df_main_data  <-  df_main_data %>%
+        
+        # include presepi dhis2 site name
+      left_join(df_site_mapping,by = c("SiteCode" = "SiteCode")) %>%
+        
+        #include presepi dhis2 siteId
+        left_join(df_orgunits, by = c("site_dhis2" = "name"))  %>%
+        
+        # test one site
+        filter(SiteCode == "HSN")
+       
+        
     
-    
-    ##  generate the data file -------------------------------------------------------------------------
-    
-    # Use the source data,the site mapping, the variable mapping, and the metadata from dhis2
-    # to create and xml file that will be use as input for the data transfer
-    # your are doing 2 functions 1- assign data element to data 2 - create xml or json
-    
-    
-    node <- newXMLNode("data", attrs = list(trackedEntity = trackedEntity,program = programId[[2]]))
+    # create root node
+    node <- newXMLNode("data", attrs = list(trackedEntity = trackedEntity,program = df_program$Id[[2]]))
     nodeCollection <- c("Instances")
     sapply(nodeCollection,newXMLNode,parent = node)
     
-    # can i use walk iteration function
-    # for each row in the main data
-    for(drow in 1:nrow(head(loop_data,10))){
+    tr_main_data_test <- df_main_data %>%
         
-        ##mapping trackedentityinstances and create xml data
-        SiteCode <- loop_data[drow,"SiteCode", drop = TRUE]
-        DateFrm <-  loop_data[drow,"DateFrm",drop = TRUE]
+            # transpose to list
+                transpose() %>%
         
-        # print(SiteCode)
-        # print(DateFrm)
-        # get site Id from tb_orgunit
-        # how to filter to return a caracter string not datatable or tibble ????? 
-        site_name <- site_mapping[site_mapping$SiteCode == "HSC","site_dhis2", drop = TRUE]
-        
-        print(site_name)
-        site_name <- as.character(site_name)
-        # orgunit <- filter(tb_orgunits, name == "HFSC:Hopital Foyer Ste Camille")$Id
-        orgunit <- tb_orgunits[which(tb_orgunits$name == site_name),"Id",drop = TRUE]
-        orgunit
-        # orgunit <- tb_orgunits[2,"Id",drop = TRUE]
-        
-        # print(orgunit)
-        
+            # test
+              head(10)
+
+     for( i in seq_along(tr_main_data_test)) {
+         
+         x <- tr_main_data_test[[i]]
+         
         # create instance
         instance <- newXMLNode("instance",
-                   attrs = list(orgunit = orgunit,enrollmentdate =as.character(DateFrm)),
+                   attrs = list(orgunit = as.character(x[["orgunitsId"]]),enrollmentdate =as.character(x[["DateFrm"]])),
                    parent = node[["Instances"]])
         
-        #why this should not change
-        attr_list <- mapping[mapping$tracker_type == "Attribute",] 
-        attributes <- newXMLNode("attributes",parent = instance)
+        # create attribute
+         attributes <- newXMLNode("attributes",parent = instance)
+        tr_mapping_attr <- df_mapping %>% 
+            filter(tracker_type == "Attribute") %>%
+              select(VariableName,Id) %>%
+                        transpose()
         
-        ## can i use walk iteration function ??? this could be a vector
-        ## Adding instances attributes
-        for(attr_row in 1:nrow(attr_list)) {
-        
-            attr_Id <- attr_list[attr_row,"Id", drop = TRUE]
-            attr_Name <- attr_list[attr_row,"VariableName", drop = TRUE]
+        for( j in seq_along(tr_mapping_attr)) {
+
+            y <- tr_mapping_attr[[j]]
+            var_name <- y["VariableName"]$VariableName
             
-            # print(attr_Id)
-            # print(attr_Name)
-            
-            attr_Value <- loop_data[drow,attr_Name, drop = TRUE]
             newXMLNode("attribute",
-                       attrs = list(id=attr_Id, value=attr_Value, name =attr_Name ),parent = attributes)
-                
+                       attrs = list(id=y[["Id"]], value=x[[var_name]], name =y[["VariableName"]] ),parent = attributes)
         }
         
-          # create stages tag
-          nodeProgramStages <- newXMLNode("ProgramStages",parent = instance)
         
-        ## mapping for each programstages dataelement and create xml data
-        # add programstage node
-         
-          for(rowstage in 1:nrow(head(tb_programStage,4)) ) {
+        # create program stage node
+        nodeProgramStages <- newXMLNode("ProgramStages",parent = instance)
     
-              name <- tb_programStage[rowstage,"name",drop = TRUE]
-              Id <- tb_programStage[rowstage,"Id",drop = TRUE]
-              
-              # print(name)
-              # print(Id)
-              
-              nodeprogramStage <- newXMLNode("ProgramStage",
-                                              attrs = list(id =Id, name=name), parent=nodeProgramStages)
-                 # what dataelement are in each stage
-                 # 
-              DE_stage <- mapping[ which(mapping$programStage == Id),]
-              #DE_stage <- filter(mapping, programStage ==  Id)
-              
-              events <- newXMLNode("events",attrs = list(program =programId[[2]], orgunit = orgunit,
-                                                         eventDate = DateFrm ),parent = nodeprogramStage)
-              dataValues <- newXMLNode("dataValues",parent = events)
-    
-              # each data elements is added as datavalue for the stage
-              for(de in 1:nrow(DE_stage)){
-    
-                  de_Id <- DE_stage[de,"Id", drop = TRUE]
-                  de_Name <- DE_stage[de,"VariableName", drop = TRUE]
-                  
-                  # print(de_Id)
-                  # print(de_Name)
-                    
-                   # ?? what best way to get the value may be a function
-                   de_Value <- loop_data[drow,de_Name, drop = TRUE]
-                   newXMLNode("dataValue",
-                             attrs = list(id=de_Id, value=de_Value, name = de_Name),parent = dataValues)
-              }
-              
-        }
+        tr_programStage <- df_programStages %>%
+                        filter(name %in% c("QUESTIONNAIRE DESTINÉ AU PATIENT",
+                                           "RESULTAT POUR SELLES",
+                                           "RESULTAT POUR SERUM",
+                                           "RESULTAT POUR LIQUIDE PLEURAL")) %>%
+                        select(name,Id) %>%
+                        transpose()
+        
+        for( k in seq_along(tr_programStage)){
             
-      
-    }
-    saveXML(node,"node.xml")
+            v <- tr_programStage[[k]]    
+             nodeprogramStage <- newXMLNode("ProgramStage",
+                                              attrs = list(id =v[["Id"]], name=v[["name"]]), parent=nodeProgramStages)
+            
+            
+             stageId <- v[["Id"]]
+             # create stage data elements 
+             tr_mapping_dataElement <- df_mapping %>% 
+            filter(tracker_type == "dataElement", programStage == stageId) %>%
+              select(VariableName,Id) %>%
+                        transpose()
+             
+              events <- newXMLNode("events",attrs = list(program =df_program$Id[[2]], orgunit = as.character(x[["orgunitsId"]]),
+                                                         eventDate = x[["DateFrm"]] ),parent = nodeprogramStage)
+              dataValues <- newXMLNode("dataValues",parent = events)
+              
+             for(l in seq_along(tr_mapping_dataElement)){
+                 
+                 s <- tr_mapping_dataElement[[l]]
+                 dataElment_name <- s[["VariableName"]]
+                 
+                  newXMLNode("dataValue",
+                             attrs = list(id=s[["Id"]], value=x[[dataElment_name]], name = s[["VariableName"]]),parent = dataValues)
+                 
+             }
+             
+            } 
+        
+        
+        
+         
+     }
+    
+  
+    saveXML(node,"node2.xml")
 }
+
+generateXMLDataFile()
 
 
 # write_csv(main_data_col,"main_data_col.csv")
-#write_csv(tb_dataElement,"dataElements2.csv")
+# write_csv(tb_dataElement,"dataElements2.csv")
 # write_csv(tb_programTrackedEntityAttribute,"EntityAttribute.csv")
 
 # Create xml template with the data needed
@@ -265,4 +263,4 @@ generateXMLDataFile <- function() {
 # review mapping
 # prepare test batch - send email
 # generate csv format
-# 
+
