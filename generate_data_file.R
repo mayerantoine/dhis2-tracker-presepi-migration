@@ -20,7 +20,16 @@ loadMainData <- function() {
     # main_data table
     df_main_data <-
         read_tsv("./data/main_data_final.txt",col_names = T) %>%
-        filter(!is.na(SiteCode))
+        
+        # remove site with no code
+        filter(!is.na(SiteCode)) %>%
+    
+            # include presepi dhis2 site name
+      left_join(df_site_mapping,by = c("SiteCode" = "SiteCode")) %>%
+        
+        #include presepi dhis2 siteId
+        left_join(df_orgunits, by = c("site_dhis2" = "name")) 
+        
     
     df_main_data
     # main data complement table
@@ -79,13 +88,15 @@ getVariableMapping <- function() {
         
 }
 
-    df_main_data <- loadMainData()
+  
     
     df_site_mapping <- loadSiteMapping()
     
     df_mapping <- getVariableMapping()
     
-# which sites ?  date ? how many records by site?
+    df_main_data <- loadMainData()
+    
+# which sites ? by date ? how many records by site?
 
 generateXMLDataFile <- function() {
 
@@ -104,7 +115,7 @@ generateXMLDataFile <- function() {
         
     
     # create root node
-    node <- newXMLNode("data", attrs = list(trackedEntity = trackedEntity,program = df_program$Id[[2]]))
+    node <- newXMLNode("data", attrs = list(trackedEntity = trackedEntity,program = presePiId))
     nodeCollection <- c("Instances")
     sapply(nodeCollection,newXMLNode,parent = node)
     
@@ -136,7 +147,6 @@ generateXMLDataFile <- function() {
 
             y <- tr_mapping_attr[[j]]
             var_name <- y["VariableName"]$VariableName
-            
             newXMLNode("attribute",
                        attrs = list(id=y[["Id"]], value=x[[var_name]], name =y[["VariableName"]] ),parent = attributes)
         }
@@ -144,7 +154,6 @@ generateXMLDataFile <- function() {
         
         # create program stage node
         nodeProgramStages <- newXMLNode("ProgramStages",parent = instance)
-    
         tr_programStage <- df_programStages %>%
                         filter(name %in% c("QUESTIONNAIRE DESTINÉ AU PATIENT",
                                            "RESULTAT POUR SELLES",
@@ -167,15 +176,13 @@ generateXMLDataFile <- function() {
               select(VariableName,Id) %>%
                         transpose()
              
-              events <- newXMLNode("events",attrs = list(program =df_program$Id[[2]], orgunit = as.character(x[["orgunitsId"]]),
+              events <- newXMLNode("events",attrs = list(program =presePiId, orgunit = as.character(x[["orgunitsId"]]),
                                                          eventDate = x[["DateFrm"]] ),parent = nodeprogramStage)
               dataValues <- newXMLNode("dataValues",parent = events)
               
              for(l in seq_along(tr_mapping_dataElement)){
-                 
                  s <- tr_mapping_dataElement[[l]]
                  dataElment_name <- s[["VariableName"]]
-                 
                   newXMLNode("dataValue",
                              attrs = list(id=s[["Id"]], value=x[[dataElment_name]], name = s[["VariableName"]]),parent = dataValues)
                  
@@ -183,9 +190,6 @@ generateXMLDataFile <- function() {
              
             } 
         
-        
-        
-         
      }
     
   

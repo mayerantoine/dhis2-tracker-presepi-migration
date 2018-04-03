@@ -58,7 +58,7 @@ getTrackedEntity <- function() {
     
     url_id <-
         "http://209.61.231.45:8082/dhis/api/trackedEntities.xml?fields=id,name&links=false&paging=false"
-    
+   
   
     root_id <- queryURL(url_id)
     
@@ -86,7 +86,7 @@ getProgram <- function() {
     df_program <-
         do.call(rbind, Map(data.frame, Id = programId, name = programName))
     
-    df_program
+    PresePiId <- as.character(programId[[3]])
     
 
 }
@@ -95,30 +95,50 @@ getProgram <- function() {
 ## PRESEPI Program -------------------------------------------------------------------------------------------------------
 ## url <- "http://209.61.231.45:8082/dhis/api/programs/ybHHvBdo1ke.xml?fields=id,name,programTrackedEntityAttributes[id,name,code],organisationUnits[id,name],programStages[id,name]"
 
-getProgramTrackedEntity <- function(){
+getTrackedEntityAttribute <- function(){
         url <-
-        "http://209.61.231.45:8082/dhis/api/programs/ybHHvBdo1ke.xml?fields=id,name,programTrackedEntityAttributes[id,name,code],organisationUnits[id,name],programStages[id,name]"
+        "http://209.61.231.45:8082/dhis/api/programs/ybHHvBdo1ke.xml?fields=id,name,programTrackedEntityAttributes,organisationUnits[id,name],programStages[id,name]"
+        
+          
     
     rootNode <- queryURL(url)
     programTrackedEntityAttribute <- rootNode[["programTrackedEntityAttributes"]]
  
+    xmlChildren(programTrackedEntityAttribute[[1]])$trackedEntityAttribute
+    map(xmlChildren(programTrackedEntityAttribute), function(x){ 
+        
+            child <- xmlChildren(x)[["trackedEntityAttribute"]]
+            
+            trId <- xmlGetAttr(child,"id")
+        })
+    
     
         #programTrackedEntity
-    programTrackedEntityAttributeId <-
-        as.list(xmlSApply(programTrackedEntityAttribute, xmlGetAttr, "id"))
+    TrackedEntityAttributeId <-
+        map(xmlChildren(programTrackedEntityAttribute), function(x){ 
+        
+            child <- xmlChildren(x)[["trackedEntityAttribute"]]
+            
+            trId <- xmlGetAttr(child,"id")
+        })
     programTrackedEntityAttributeName <-
         as.list(xmlSApply(programTrackedEntityAttribute, xmlGetAttr, "name"))
     
-    tb_programTrackedEntityAttribute <-
+    df_TrackedEntityAttribute <-
         do.call(
             rbind,
             Map(
                 data.frame,
-                Id = programTrackedEntityAttributeId,
+                Id = TrackedEntityAttributeId,
                 name = programTrackedEntityAttributeName,
                 stringsAsFactors = FALSE
             )
         )
+    
+    
+    df_TrackedEntityAttribute
+    
+
 }
 
 
@@ -165,7 +185,7 @@ getOrgunits <- function(){
     #orgunits
     orgunitsId <- as.list(xmlSApply(orgunits, xmlGetAttr, "id"))
     orgunitsName <- as.list(xmlSApply(orgunits, xmlGetAttr, "name"))
-    tb_orgunits <-
+    df_orgunits <-
         do.call(rbind,
                 Map(
                     data.frame,
@@ -173,6 +193,10 @@ getOrgunits <- function(){
                     name = orgunitsName,
                     stringsAsFactors = FALSE
                 ))
+    
+    Encoding(df_orgunits$name) <- "UTF-8"
+    
+    df_orgunits
     
     
 }
@@ -258,12 +282,12 @@ getDataElement <- function() {
 ## run all ------------------------------------------------------------------------------------------------
 
 trackedEntity <- getTrackedEntity()
-df_program <- getProgram()
+presePiId <- getProgram()
 
-df_programTrackedEntityAttribute <- getProgramTrackedEntity()
+df_TrackedEntityAttribute <- getTrackedEntityAttribute()
 df_programStages <- getProgamStages()
 df_programStageDataElement <- getPresePiProgramStage(df_programStages$Id)
 df_orgunits <- getOrgunits()
 df_dataElement <- getDataElement()
-df_metadata <- rbind(df_programTrackedEntityAttribute[c(1:2)],df_dataElement[c(1:2)])
+df_metadata <- rbind(df_TrackedEntityAttribute[c(1:2)],df_dataElement[c(1:2)])
 
