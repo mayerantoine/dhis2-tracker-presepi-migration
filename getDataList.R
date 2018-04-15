@@ -3,9 +3,8 @@
  getDataList <-  function(tr_main_data)   {  
      
     main_list <-  map(tr_main_data,function(x){
-         
-         
-        instance <-  list( instance_attribute = list(orgunit =x[["orgunit"]],enrollmentdate=x[["DateFrm"]]),
+        instance <-  list( instance_attribute = list(orgunit = as.character(x[["orgunit"]]),
+                                                     enrollmentdate=as.character(x[["DateFrm"]])),
                            attributes = list(),
                            ProgramStages= list())
         
@@ -21,7 +20,6 @@
               
           })
         
-        
          tr_programStage <- df_programStages %>%
                         filter(name %in% c("QUESTIONNAIRE DESTINÉ AU PATIENT",
                                            "RESULTAT POUR SELLES",
@@ -31,8 +29,7 @@
                         transpose()
          
         instance[["ProgramStages"]] <- map(tr_programStage, function(v){
-             
-             ProgramStage <- list( program_stage_attribute = 
+         ProgramStage <- list( program_stage_attribute = 
                                        list(id =v[["Id"]], name=v[["name"]]),
                                     events =
                                         list(attrs = list(), dataValues = list()) )
@@ -76,10 +73,9 @@
               head(10)
      
      
-     my_data_list <- getDataList(tr_main_data_test)
-    library(jsonlite)
-     node3_json <- toJSON(my_data_list,pretty = T)
-
-      write(node3_json,"node3_json.json")
+ my_data_list <- getDataList(tr_main_data_test)
+ library(jsonlite)
+ node3_json <- toJSON(my_data_list,pretty = T)
+ write(node3_json,"node3_json.json")
 
  
