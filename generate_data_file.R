@@ -11,6 +11,9 @@
 library(RCurl)
 library(XML)
 library(tidyverse)
+library(lubridate)
+library(httr)
+library(jsonlite)
 
 rm(list = ls())
 source("query_presepi_metadata.R")
@@ -23,12 +26,18 @@ loadMainData <- function() {
         
         # remove site with no code
         filter(!is.na(SiteCode)) %>%
+        
+        # remove DateFrm NA
+        filter(!is.na(DateFrm)) %>%
     
             # include presepi dhis2 site name
       left_join(df_site_mapping,by = c("SiteCode" = "SiteCode")) %>%
         
         #include presepi dhis2 siteId
-        left_join(df_orgunits, by = c("site_dhis2" = "name")) 
+        left_join(df_orgunits, by = c("site_dhis2" = "name")) %>%
+        
+        ## year
+        mutate( year_case = year(mdy(DateFrm)), month_case = month(mdy(DateFrm)))
         
     
     df_main_data
