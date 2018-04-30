@@ -34,6 +34,15 @@ addTrackedEntityInstance <- function(payload) {
          
          # we should return the current Id 
          import_message <- res$response[["importSummaries"]][[1]]$conflicts[[1]]$value 
+         patientId <- payload$attributes[[3]]$value
+         tei <- try(getTrackedEntityInstanceId(patientId,payload$orgUnit), silent = TRUE)
+         
+         if(!is.error(tei)) {
+            ## we could update
+            return(tei)
+         }
+         
+ 
           stop("Conflict while adding Tracked entity.",import_message)   
                
         }
@@ -46,6 +55,25 @@ addTrackedEntityInstance <- function(payload) {
     
 }
 
+getTrackedEntityInstanceId <- function(patientId,ou){
+    
+    url <- "http://209.61.231.45:8082/dhis/api/26/trackedEntityInstances.json?filter=RTIdYLyRN3M"
+    patientId <- paste0(":EQ:",patientId)
+    orgUnit <- paste0("&ou=",ou)
+    
+    url_get_id <- paste0(url,patientId,orgUnit)
+    res <- GET(url_get_id)
+    res <- content(res, mime = "application/json")
+    
+    if( !(length(res$trackedEntityInstance) > 0) ){
+        stop("Failed to look up existing tracked entity instance")
+    }
+    
+    
+    tei <- res$trackedEntityInstances[[1]]$trackedEntityInstance
+    return(tei)
+    
+}
 
 enrollInProgram <- function(payload) {
     url_enrol <- "http://209.61.231.45:8082/dhis/api/enrollments"
@@ -62,6 +90,14 @@ enrollInProgram <- function(payload) {
          
          # we should return the current Id 
          import_message <- res$response[["importSummaries"]][[1]]$description
+         
+         tei <- payload$trackedEntityInstance
+         enroll_id <- try(getEnrollmentId(tei,payload$orgUnit), silent = TRUE)
+         if(!is.error(enroll_id)) {
+            
+             ##update ?? No need to update
+             return(enroll_id)
+         }
           stop("Conflict enrolling entity in program.",import_message)   
                
         }
@@ -75,6 +111,25 @@ enrollInProgram <- function(payload) {
 
 }
 
+
+getEnrollmentId <- function(tei,ou){
+    
+    url <- "http://209.61.231.45:8082/dhis/api/26/enrollments.json?"
+    orgUnit <- paste0("ou=",ou)
+    tei <- paste0("&trackedEntityInstance=",tei)
+     
+    url_get_id <- paste0(url,orgUnit,tei)
+    res <- GET(url_get_id)
+    res <- content(res, mime = "application/json")
+    
+     
+    if( !(length(res$enrollments) > 0) ){
+        stop("Failed to look up existing enrollment")
+    }
+    
+    enroll_id <- res$enrollments[[1]]$enrollment
+    return(enroll_id)
+}
 
 addEvent <- function(payload) {
     url_event <- "http://209.61.231.45:8082/dhis/api/events"
@@ -93,11 +148,12 @@ addEvent <- function(payload) {
          
          # we should return the current Id 
          import_message <- res$response[["importSummaries"]][[1]]$description
-          stop("Conflict while adding Tracked entity.",import_message)   
+        
+          stop("Conflict while adding Event.",import_message)   
                
         }
         # return error adding failed
-        stop("Adding Tracked entity failed.",res$message)
+        stop("Adding Event.",res$message)
      }
     
     eventId <- res$response$importSummaries[[1]]$reference
@@ -124,8 +180,7 @@ loadJsonData <- function() {
         payload <- list(
             trackedEntity = "MCPQUTHX1Ze",
             orgUnit = orgunit,
-            attributes = attributes,
-            enrollments = list(enroll_load)
+            attributes = attributes
         )
         
         
@@ -135,6 +190,7 @@ loadJsonData <- function() {
         tei <-
             try(addTrackedEntityInstance(payload = payload), silent = TRUE)
         
+        # If error add tracked entity instance not do anything 
         if (!is.error(Id)) {
             ## enrollement payload
             enroll_load <- list(
